@@ -1,44 +1,95 @@
-// create map
-var myMap = L.map('map').setView([48.868672,2.342130],12);
+function getLocation() {
+  navigator.geolocation.getCurrentPosition(createMap, showError);
+}
 
-// add openstreetmap tiles
-    // Add OpenStreetMap tiles:
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: '© OpenStreetMap',
+function createMap(position) {
+  let markerResult = [];
+  let layerGrp;
+
+  // Create Main Map
+  var myMap = L.map("map").setView(
+    [position.coords.latitude, position.coords.longitude],
+    12
+  );
+
+  // Add OpenStreetMap tiles:
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    attribution: "© OpenStreetMap",
     maxZoom: 19,
-}).addTo(myMap)
+  }).addTo(myMap);
 
+  //Add Geolocation Marker for User
+  let marker = L.marker([
+    position.coords.latitude,
+    position.coords.longitude,
+  ]).addTo(myMap);
+  marker.bindPopup("<b>You Are Here</b>").openPopup();
 
-// create and main add geolocation marker
-let marker = L.marker([48.87007, 2.346453]).addTo(myMap);
-marker.bindPopup('<b>The Hoxton, Paris</b>').openPopup();
+  // Add Event Listener to Select Menu
+  let userSelection = document.querySelector(".map-select");
+  userSelection.addEventListener("change", function () {
+    findBusiness(this.options[this.selectedIndex].text, position);
+  });
 
+  //  Find Local Businesses
+  async function findBusiness(search, location) {
+    const options = {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+      },
+    };
+    if (search != "Business Type:") {
+      const response = await fetch(
+        `https://cors-anywhere.herokuapp.com/https://maps.googleapis.com/maps/api/place/nearbysearch/json?keyword=${search}&location=${location.coords.latitude}%2C${location.coords.longitude}&radius=8047&key=AIzaSyAN0dWXG8p1I9qbLsosB8EJ5uoI71wGcTw`,
+        options
+      );
+      const result = await response.json();
+      const list = result.results;
+      createMarker(list);
+    }
+  }
 
-// draw the 2nd arrondissement
-let polygon = L.polygon([                                        
-  [48.863368120198004, 2.3509079846928516],
-  [48.86933262048345, 2.3542531602919805],
-  [48.87199261164275, 2.3400569901592183],
-  [48.86993336274516, 2.3280142476578813],
-  [48.86834104280146, 2.330308418109664]
-],{fill:false}).addTo(myMap);
+  //   Create Markers for Found Businesses/Clear Old Markers
+  async function createMarker(businesses) {
+    if (markerResult.length > 0) {
+      layerGrp.remove();
+      layerGrp = null;
+      markerResult = [];
+    }
+    await businesses.forEach((business) => {
+      const myIcon = L.icon({
+        iconUrl: business.icon,
+        iconSize: [38, 38],
+        iconAnchor: [19, 38],
+      });
 
-// create red pin marker
-let myIcon = L.icon({
-    iconUrl: 'assets/red-pin.png',
-    iconSize: [38,38],
-    iconAnchor: [19,38]
-})
+      const element = L.marker(
+        [business.geometry.location.lat, business.geometry.location.lng],
+        { icon: myIcon }
+      ).bindPopup(business.name);
+      markerResult.push(element);
+    });
+    layerGrp = L.layerGroup(markerResult).addTo(myMap);
+  }
+}
 
-// metro station markers
-const rS = L.marker([48.866200610611926, 2.352236247419453],{icon: myIcon}).bindPopup('Reaumur-Sebastopol')
-const sSD = L.marker([48.869531786321566, 2.3528590208055196],{icon: myIcon}).bindPopup('Strasbourg-Saint-Denis')
-const sentier = L.marker([48.8673721067762, 2.347107922912739],{icon: myIcon}).bindPopup('Sentier')
-const bourse = L.marker([48.86868503971672, 2.3412285142058167],{icon: myIcon}).bindPopup('Bourse')
-const qS = L.marker([48.869560129483226, 2.3358638645569543],{icon: myIcon}).bindPopup('Quatre Septembre')
-const gB = L.marker([48.871282159004856, 2.3434818588892714],{icon: myIcon}).bindPopup('Grands Boulevards')
+// Location Error Handling
+function showError(error) {
+  switch (error.code) {
+    case error.PERMISSION_DENIED:
+      window.alert("User denied the request for Geolocation.");
+      break;
+    case error.POSITION_UNAVAILABLE:
+      window.alert("Location information is unavailable.");
+      break;
+    case error.TIMEOUT:
+      window.alert("The request to get user location timed out.");
+      break;
+    case error.UNKNOWN_ERROR:
+      window.alert("An unknown error occurred.");
+      break;
+  }
+}
 
-const stations = L.layerGroup([rS, sSD, sentier, bourse, qS, gB]).addTo(myMap)
-
-
-
+getLocation();
